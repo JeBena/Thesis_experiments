@@ -1,0 +1,367 @@
+---
+title: "Script R pour le traitement des données de l'expérience 1"
+author: "Jérémy Béna"
+date: "12 août 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Ce document vise à montrer le script conçu pour traiter les données. Des données générées aléatoirement sont utilisées pour l'exemplifier. 
+
+#Initialisation et visualisation
+
+Dans un premier temps, on récupère les données qui ont été stockées dans un fichier .csv. On les associe ensuite à un data frame.
+
+```{r, include=TRUE}
+data = read.csv("C:/Users/benaj/Dropbox/Dossier EXP/Expérience 1/exp/traitements/csv/data/data_exp1.csv")
+
+data_extend = read.csv("C:/Users/benaj/Dropbox/Dossier EXP/Expérience 1/exp/traitements/csv/data/data_extendexp1.csv")
+
+#Chemin du fichier sur mon ordinateur
+```
+
+
+On fait des VI inter-groupe des facteurs afin de pouvoir les utiliser ensuite. Les ANOVA supposent de traiter les participants comme un facteur.
+
+```{r, include=TRUE}
+data$manip_attention = as.factor(data$manip_attention) 
+data$manip_cred = as.factor(data$manip_cred)
+data$ppt = as.factor(data$ppt)
+
+data_extend$manip_attention = as.factor(data_extend$manip_attention) 
+data_extend$manip_cred = as.factor(data_extend$manip_cred)
+data_extend$ppt = as.factor(data_extend$ppt)
+```
+
+On peut jeter un oeil aux données, sous forme de tableaux
+
+```{r, include=TRUE, comment = ""}
+head(data)
+summary(data)
+head(data_extend)
+summary(data_extend)
+```
+
+Des graphiques représentant la distribution sous forme de densité peuvent être fait pour les cinq principales variables
+
+```{r, include=TRUE, echo = TRUE}
+plot(density(data$prop_true_r),main="Density plot prop true repet")
+plot(density(data$prop_true_n),main="Density plot prop true new")
+plot(density(data$prop_true_cred),main="Density plot prop cred")
+plot(density(data$prop_true_noncred),main="Density plot non cred")
+plot(density(data$prop_cred_cred),main="Density plot attrib cred à cred")
+plot(density(data$prop_nocred_nocred),main="Density plot attrib non cred à non cred")
+```
+
+Des graphiques plus précis sur la distribution des données en fonction des deux facteurs inter groupes peuvent être visualisés. 
+(les titres sont trop longs et risquent d'être mal représentés)
+
+```{r, include=TRUE, echo=TRUE, comment=""}
+require(yarrr) #Graphiques avec le package "yarrr"
+
+#Proportion jugements vrais énoncés répétés
+pirateplot(prop_true_r~manip_attention+manip_cred,data=data,
+           pal = gray(.1), #spécifie la couleur de la barre montrant la moyenne
+           avg.line.o = .8, #Transparence de la barre représentation la moyenne
+           theme = 0, #On peut spécifier le thème au besoin
+           inf.f.o = .6, #Là on a le niveau de transparence de l'intervalle de confiance
+           inf.f.col = piratepal("southpark"), #On peut choisir la couleur à associer.
+           point.o = .1, #Modifier la transparence des points qui représentent les observations
+           gl.col = gray(.9), #On peut spécifier la transparence des lignes horizontales
+           gl.lty = 5, #Leur aspect également (continu, pointillé...)
+           gl.lwd = c(.3, 2), #leur épaisseur, là une ligne sur deux.
+           main = "Moyennes proportions de jugements 'vrai' des énoncés répétés en fonction de la division de l'attention et de la crédibilité", #ajouter un titre en haut
+           xlab = "Manipulation de l'attention", #Changer le nom de l'axe VI
+           ylab = "Moyenne % jugements 'vrai'") #Changer le nom de l'axe VD
+
+#Proportion jugements vrais énoncés liste 1/ crédibles
+pirateplot(prop_true_cred~manip_attention+manip_cred,data=data,
+           pal = gray(.1), #spécifie la couleur de la barre montrant la moyenne
+           avg.line.o = .8, #Transparence de la barre représentation la moyenne
+           theme = 0, #On peut spécifier le thème au besoin
+           inf.f.o = .6, #Là on a le niveau de transparence de l'intervalle de confiance
+           inf.f.col = piratepal("southpark"), #On peut choisir la couleur à associer.
+           point.o = .1, #Modifier la transparence des points qui représentent les observations
+           gl.col = gray(.9), #On peut spécifier la transparence des lignes horizontales
+           gl.lty = 5, #Leur aspect également (continu, pointillé...)
+           gl.lwd = c(.3, 2), #leur épaisseur, là une ligne sur deux.
+           main = "Moyennes proportions de jugements 'vrai' des énoncés liste 1/ crédible en fonction de la division de l'attention et de la crédibilité", #ajouter un titre en haut
+           xlab = "Manipulation de l'attention", #Changer le nom de l'axe VI
+           ylab = "Moyenne % jugements 'vrai'") #Changer le nom de l'axe VD
+
+#Proportion jugements vrais énoncés liste 2/ non crédibles
+pirateplot(prop_true_noncred~manip_attention+manip_cred,data=data,
+           pal = gray(.1), #spécifie la couleur de la barre montrant la moyenne
+           avg.line.o = .8, #Transparence de la barre représentation la moyenne
+           theme = 0, #On peut spécifier le thème au besoin
+           inf.f.o = .6, #Là on a le niveau de transparence de l'intervalle de confiance
+           inf.f.col = piratepal("southpark"), #On peut choisir la couleur à associer.
+           point.o = .1, #Modifier la transparence des points qui représentent les observations
+           gl.col = gray(.9), #On peut spécifier la transparence des lignes horizontales
+           gl.lty = 5, #Leur aspect également (continu, pointillé...)
+           gl.lwd = c(.3, 2), #leur épaisseur, là une ligne sur deux.
+           main = "Moyennes proportions de jugements 'vrai' des énoncés liste 2/ non crédible en fonction de la division de l'attention et de la crédibilité", #ajouter un titre en haut
+           xlab = "Manipulation de l'attention", #Changer le nom de l'axe VI
+           ylab = "Moyenne % jugements 'vrai'") #Changer le nom de l'axe VD
+
+#Proportion jugements vrais énoncés nouveaux 
+pirateplot(prop_true_n~manip_attention+manip_cred,data=data,
+           pal = gray(.1), #spécifie la couleur de la barre montrant la moyenne
+           avg.line.o = .8, #Transparence de la barre représentation la moyenne
+           theme = 0, #On peut spécifier le thème au besoin
+           inf.f.o = .6, #Là on a le niveau de transparence de l'intervalle de confiance
+           inf.f.col = piratepal("southpark"), #On peut choisir la couleur à associer.
+           point.o = .1, #Modifier la transparence des points qui représentent les observations
+           gl.col = gray(.9), #On peut spécifier la transparence des lignes horizontales
+           gl.lty = 5, #Leur aspect également (continu, pointillé...)
+           gl.lwd = c(.3, 2), #leur épaisseur, là une ligne sur deux.
+           main = "Moyennes proportions de jugements 'vrai' des énoncés nouveaux en fonction de la division de l'attention et de la crédibilité", #ajouter un titre en haut
+           xlab = "Manipulation de l'attention", #Changer le nom de l'axe VI
+           ylab = "Moyenne % jugements 'vrai'") #Changer le nom de l'axe VD
+
+#Proportion d'attributions correctes à la liste1/ crédible
+pirateplot(prop_cred_cred~manip_attention+manip_cred,data=data,
+           pal = gray(.1), #spécifie la couleur de la barre montrant la moyenne
+           avg.line.o = .8, #Transparence de la barre représentation la moyenne
+           theme = 0, #On peut spécifier le thème au besoin
+           inf.f.o = .6, #Là on a le niveau de transparence de l'intervalle de confiance
+           inf.f.col = piratepal("southpark"), #On peut choisir la couleur à associer.
+           point.o = .1, #Modifier la transparence des points qui représentent les observations
+           gl.col = gray(.9), #On peut spécifier la transparence des lignes horizontales
+           gl.lty = 5, #Leur aspect également (continu, pointillé...)
+           gl.lwd = c(.3, 2), #leur épaisseur, là une ligne sur deux.
+           main = "Moyennes proportions d'attributions correctes à la liste 1/ crédible en fonction de la division de l'attention", #ajouter un titre en haut
+           xlab = "Manipulation de l'attention", #Changer le nom de l'axe VI
+           ylab = "Moyenne % attributions correctes à liste 1/ crédible") #Changer le nom de l'axe VD
+
+#Proportion d'attributions correctes à la liste2/ non crédible
+
+pirateplot(prop_nocred_nocred~manip_attention+manip_cred,data=data,
+           pal = gray(.1), #spécifie la couleur de la barre montrant la moyenne
+           avg.line.o = .8, #Transparence de la barre représentation la moyenne
+           theme = 0, #On peut spécifier le thème au besoin
+           inf.f.o = .6, #Là on a le niveau de transparence de l'intervalle de confiance
+           inf.f.col = piratepal("southpark"), #On peut choisir la couleur à associer.
+           point.o = .1, #Modifier la transparence des points qui représentent les observations
+           gl.col = gray(.9), #On peut spécifier la transparence des lignes horizontales
+           gl.lty = 5, #Leur aspect également (continu, pointillé...)
+           gl.lwd = c(.3, 2), #leur épaisseur, là une ligne sur deux.
+           main = "Moyennes proportions d'attributions correctes à la liste 2/ non crédible en fonction de la division de l'attention", #ajouter un titre en haut
+           xlab = "Manipulation de l'attention", #Changer le nom de l'axe VI
+           ylab = "Moyenne % attributions correctes à liste 2/ non crédible") #Changer le nom de l'axe VD
+
+```
+
+#Test de la normalité
+
+Vérifions la normalité des données : 
+
+```{r, include=TRUE, comment = ""}
+shapiro.test(data$prop_true_r)
+shapiro.test(data$prop_true_cred)
+shapiro.test(data$prop_true_noncred)
+shapiro.test(data$prop_true_n)
+
+shapiro.test(data$prop_cred_cred)
+shapiro.test(data$prop_nocred_nocred)
+```
+
+Les données ne suivent pas une loi normale dans cet exemple.
+
+#ANOVAs
+
+Chargement des packages nécessaires aux traitements et graphiques à faire
+
+```{r, include=TRUE, comment =""}
+require(ggplot2) 
+require(gplots) #Graphiques
+require(psych) #Stats descriptives et analyses
+require(lme4) #Analyses
+require(ez) #Analyses
+require(compute.es) #Tailles d'effets
+require(dplyr) #pour la fonction gather()
+require(tidyr)
+require(xtable)#tableaux LaTeX
+```
+
+Afin de faire les ANOVA mixtes, il faut opérer des changements dans les données. La variable intra doit être explicitée
+
+Bien qu'elle ne soit pas directement utile, j'ai créé un data frame distinguant les énoncés répétés et les nouveaux pour voir les variations du jugement de vérité
+
+```{r, include=TRUE}
+data_rep <- gather(data, repetition, value, prop_true_r:prop_true_n)
+data_rep$ppt <- as.factor(data_rep$ppt)
+```
+
+Idem pour la distinction entre liste 1/ crédible ; liste 2/ non crédible ; nouveaux pour les variations du jugement de vérité
+
+```{r, include=TRUE}
+#Créer trois entrées pour chaque participant (une list1/ cred ; liste 1/ no cred ; une nouv)
+data_source <- gather(data, source, value, prop_true_cred,prop_true_noncred,prop_true_n)
+data_source$ppt <- as.factor(data_source$ppt)
+```
+
+Même chose pour les attributions, avec la distinction entre liste 1/ crédible et liste 2/ non crédible
+
+```{r, include=TRUE}
+data_attrib <- gather(data, attrib, value, prop_cred_cred,prop_nocred_nocred)
+data_attrib$ppt <- as.factor(data_attrib$ppt)
+```
+
+On peut maintenant réaliser les ANOVA.
+
+Anova 2x2x3 sur la proportion de jugements 'vrai'
+
+```{r, include=TRUE, comment=""}
+aov_source_att_credez = ezANOVA(data = data_source #Data frame source
+        , dv = value #La VD est appelée value
+        , wid = ppt #On indique que c'est une variable intra
+        , within = source #On la spécifie ici
+        , between = .(manip_attention,manip_cred) #On ajoute les VI inter
+        , return_aov = TRUE
+
+)
+```
+
+On étudie les sorties du modèle
+
+```{r, include=TRUE, comment=""}
+aov_source_att_credez
+```
+
+Les post-hoc avec correction de Tukey étant délicats à réaliser ici, je pense les faire avec le logiciel JAMOVI.
+
+On réalise la deuxième Anova
+
+
+```{r, include=TRUE, comment=""}
+aov_attrib_att_credez = ezANOVA(data = data_attrib
+                                , dv = value
+                                , wid = ppt
+                                , within = attrib
+                                , between = .(manip_attention,manip_cred)
+                                , return_aov = TRUE
+)
+```
+
+On étudie les sorties du modèle
+
+```{r, include=TRUE, comment=""}
+aov_attrib_att_credez
+```
+
+#Graphiques et tableaux
+
+Représenter graphiquement les données, et avoir les tableaux qui sous-tendent ces graphiques peut être utile pour interpréter les résultats et les communiquer. Compte tenu de la nature des VD (%) et des VI (intra et inter), des boxplot représentant les moyennes et intervalles de confiance à 95% sont informatifs.
+
+Tout d'abord, sur le jugement de vérité
+
+```{r, include=TRUE, echo=TRUE}
+plot <- data_source %>% group_by(source, manip_attention, manip_cred) %>%
+  summarize(Proportion = mean(value), SE = (sd(value)/(sqrt(100))))
+plot$source = factor(plot$source, levels = c("prop_true_cred","prop_true_noncred","prop_true_n"),
+                    labels = c("Liste 1/ crédible", "Liste 2/ non crédible", "Nouveaux"))
+plot$manip_attention = factor(plot$manip_attention, levels = c("d","nd"),
+                          labels = c("Divisée","Pleine"))
+plot$manip_cred = factor(plot$manip_cred, levels = c("c","nc"),
+                            labels = c("Avec","Sans"))
+
+a <- ggplot(plot, aes(x = manip_attention, y = Proportion, fill = manip_cred)) +
+  geom_boxplot() +
+  geom_crossbar(aes(ymin = Proportion-1.96*SE+.5/100, ymax=Proportion+1.96*SE+.5/75),
+                position=position_dodge(.9), size=1, color = "black")+
+  facet_wrap(~ source)+labs(x = "Attention", y = "Moyenne proportions jugements 'vrai'", fill = "Crédibilité")+
+scale_fill_manual("Crédibilité", values = c("Avec" = "white", "Sans" = "grey"))
+
+
+a
+```
+
+On peut enregistrer l'image au besoin
+
+```{r, include=TRUE}
+pdf("C:\\Users\\benaj\\Dropbox\\Dossier EXP\\Expérience 1\\exp\\traitements\\judg.pdf",height=6, width=6)
+plot(a)
+dev.off()
+```
+
+Un tableau avec commandes LaTeX peut facilement être obtenu
+```{r, include=TRUE, comment=""}
+tab_plot = xtable(plot)
+tab_plot
+```
+
+On fait la même chose avec les attributions
+
+```{r, include=TRUE, echo=TRUE}
+plot2 <- data_attrib %>% group_by(attrib, manip_attention, manip_cred) %>%
+  summarize(Proportion = mean(value), SE = (sd(value)/(sqrt(100))))
+plot2$attrib = factor(plot2$attrib, levels = c("prop_cred_cred","prop_nocred_nocred"),
+                     labels = c("Liste 1/ crédible", "Liste 2/ non crédible"))
+plot2$manip_attention = factor(plot2$manip_attention, levels = c("d","nd"),
+                              labels = c("Divisée","Pleine"))
+plot2$manip_cred = factor(plot2$manip_cred, levels = c("c","nc"),
+                         labels = c("Avec","Sans"))
+
+b <- ggplot(plot2, aes(x = manip_attention, y = Proportion, fill = manip_cred)) +
+  geom_boxplot() +
+  geom_crossbar(aes(ymin = Proportion-1.96*SE+.5/100, ymax=Proportion+1.96*SE+.5/100),
+                position=position_dodge(.9), size=1, color = "black")+
+  facet_wrap(~ attrib)+labs(x = "Attention", y = "Moyenne proportions attributions correctes", fill = "Crédibilité")+
+  scale_fill_manual("Crédibilité", values = c("Avec" = "white", "Sans" = "grey"))
+
+b
+```
+
+Enregistrement de l'image
+
+```{r, include=TRUE}
+pdf("C:\\Users\\benaj\\Dropbox\\Dossier EXP\\Expérience 1\\exp\\traitements\\attrib.pdf",height=6, width=6)
+plot(b)
+dev.off()
+```
+
+Tableau 
+
+```{r, include=TRUE, comment=""}
+tab_plot2 = xtable(plot2)
+tab_plot2
+```
+
+#Analyses supplémentaires
+
+
+En plus de ces analyses, d'autres peuvent être réalisées. On peut par exemple étudier uniquement l'effet de vérité avec un t test ; et utiliser des modèles linéaires généralisés pour tester les principales hypothèses (1) avec des régressions logistiques et (2) en spécifiant des variables aléatoires.
+
+```{r, include=TRUE, comment=""}
+ttest = t.test(data$prop_true_r,data$prop_true_n,paired=TRUE)
+pirateplot(value~repetition,data=data_rep,plot=FALSE)
+```
+
+Pour du logistique avec variables aléatoires avec jugement de vérité et jugement de source en fonction des principales VI : 
+
+```{r, include=TRUE, comment=""}
+model_t_log <- glmer(truth_rating_num ~ enonce_repetition*manip_attention*manip_cred+(1|ppt)+(1|enonce),family=binomial,data=data_extend)
+summary(model_t_log)
+anova(model_t_log)
+
+model_att_log <- glmer(source_correct ~ enonce_repetition*manip_attention*manip_cred+(1|ppt)+(1|enonce),family=binomial,data=data_extend)
+summary(model_att_log)
+anova(model_att_log)
+```
+
+
+Enfin, de façon exploratoire, on peut s'intéresser aux temps de réponse au jugement de vérité et au jugement de source en fonction des principales variables. Il est utile de mettre en variables aléatoires les participants et les énoncés.
+
+```{r, include=TRUE, comment=""}
+model_time_truth <- lmer(truth_time ~ enonce_repetition*manip_attention*manip_cred+(1|ppt)+(1|enonce),data=data_extend)
+summary(model_time_truth)
+anova(model_time_truth)
+
+model_time_source <- lmer(source_time ~ enonce_repetition*manip_attention*manip_cred+(1|ppt)+(1|enonce),data=data_extend)
+summary(model_time_source)
+anova(model_time_source)
+```
