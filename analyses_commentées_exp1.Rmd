@@ -1,0 +1,682 @@
+---
+title: "Analyses et figures de l'expérience 1 - thèse : Répétition, division e l'attention et crédibilité"
+author: "Jérémy Béna"
+date: "11 décembre 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+Ce document présente les principales analyses et figures produites avec R présentées dans le document principal style article. J'essaie de faire ressortir les principaux résultats par des commentaires.
+
+Le code utilisé est disponible dans le document script_traitement.R. Certains morceaux de code ont été laissés ici dans l'eventualité où connaître les détails des analyses serait utile pour en comprendre les résultats. 
+
+```{r, include=FALSE,comment=NA,echo=FALSE}
+if (!require(tidyr)) {install.packages("tidyr"); library(tidyr) }
+data = read.csv("D:/OwnCloud/Dossier EXP/expérience 1/exp/traitements/csv/data/data_exp1.csv")
+data_extend = read.csv2("D:/OwnCloud/Dossier EXP/expérience 1/exp/traitements/csv/data/data_extendexp1.csv")
+#data = read.csv("C:/Users/benaj/ownCloud/Dossier EXP/expérience 1/exp/traitements/csv/data/data_exp1.csv")
+#data_extend = read.csv("C:/Users/benaj/ownCloud/Dossier EXP/expérience 1/exp/traitements/csv/data/data_extendexp1.csv")
+
+data_list <- gather(data, list, value, diff_prop_cred_n:diff_prop_nocred_n)
+
+data_attrib <- gather(data, attrib, value, prop_cred_cred_corrected,prop_nocred_nocred_corrected)
+
+data_cred = subset(data,manip_cred=='c')
+data_nocred = subset(data,manip_cred=='nc')
+
+data_list$ppt <- as.factor(data_list$ppt)
+data_list$list <- as.factor(data_list$list)
+data_attrib$ppt <- as.factor(data_attrib$ppt)
+data_attrib$attrib <- as.factor(data_attrib$attrib)
+data_listc = split(data_list,data_list$manip_cred)
+data_attribc = split(data_attrib,data_attrib$manip_cred)
+
+data$manip_attention = as.factor(data$manip_attention) 
+data$manip_cred = as.factor(data$manip_cred)
+data$ppt = as.factor(data$ppt)
+
+data_extend$manip_attention = as.factor(data_extend$manip_attention) 
+data_extend$manip_cred = as.factor(data_extend$manip_cred)
+data_extend$ppt = as.factor(data_extend$ppt)
+```
+
+```{r, include=FALSE,comment=NA,echo=FALSE}
+#Load packages
+if (!require(MBESS)) {install.packages("MBESS",repos = "http://cran.us.r-project.org"); library(MBESS) }
+if (!require(psych)) {install.packages("psych",repos = "http://cran.us.r-project.org"); library(psych) }
+if (!require(ez)) { install.packages("ez",repos = "http://cran.us.r-project.org"); library(ez) }
+if (!require(dplyr)) { install.packages("dplyr",repos = "http://cran.us.r-project.org"); library(dplyr) }
+if (!require(lsmeans)) { install.packages("lsmeans",repos = "http://cran.us.r-project.org"); library(lsmeans) }
+if (!require(effsize)) { install.packages("effsize",repos = "http://cran.us.r-project.org"); library(effsize) }
+if (!require(lsr)) { install.packages("lsr",repos = "http://cran.us.r-project.org"); library(lsr) }
+if (!require(lme4)) { install.packages("lme4",repos = "http://cran.us.r-project.org"); library(lme4) }
+if (!require(ggplot2)) { install.packages("ggplot2",repos = "http://cran.us.r-project.org"); library(ggplot2) }
+if (!require(multcompt)) { install.packages("multcomp",repos = "http://cran.us.r-project.org"); library(multcomp) }
+```
+
+#Analyses
+
+##Répliquer l'effet de vérité
+
+On peut tout d'abord tester si on a répliqué l'effet de vérité
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+#One sample t test (test value = 0) on the truth judgement score
+
+t.test(data$diff_prop_rn,mu = 0) #Main test
+cohensD(data$diff_prop_rn,mu=0) #Effect size with Cohen's d
+##95%CI were computed with JASP
+```
+
+L'effet de vérité a été montré comme statistiquement significatif. Sa taille d'effet est petite.
+
+##Scores de mémoire
+
+###Mémoire de source : variations en fonction des conditions expérimentales
+
+J'ai réalisé une ANOVA 2(liste) x 2(attention) x 2(crédibilité) sur le score de mémoire de source.
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+#Compute the 2*2*2 ANOVA on the source memory score
+
+aov_sourcememory = ezANOVA(data = data_attrib
+                                , dv = value
+                                , wid = ppt
+                                , within = attrib
+                                , between = .(manip_attention,manip_cred)
+                                , return_aov = TRUE
+                                , detailed = TRUE
+                                , type = 3
+)
+#df2 = n-N-k
+
+aov_sourcememory
+```
+
+La crédibilité a montré un effet significatif. Cet effet a été qualifié par un effet d'interaction significatif entre la crédibilité et la liste (appelée "attrib""). Des contrastes avec correction de bonferroni ont été calculés afin d'analyser les différences 2 à 2 (avec tailles des effets cohen's D)
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+##Modèle pour calculer les comparaisons multiples
+###Comparaisons multiples pour chaque variable
+lm_aov_source = lm(value~attrib+manip_attention+manip_cred,data=data_attrib)
+
+k1 = glht(lm_aov_source, mcp(attrib = "Tukey"))$linfct
+k2 = glht(lm_aov_source, mcp(manip_attention = "Tukey"))$linfct
+k3 = glht(lm_aov_source, mcp(manip_cred = "Tukey"))$linfct
+summary(glht(lm_aov_source,linfct=rbind(k1,k2,k3)), test = adjusted(type = "bonferroni"))
+ka = (glht(lm_aov_source,linfct=rbind(k1,k2,k3)))
+
+ka.ci = confint(ka,level = .95)
+plot(ka.ci)
+
+cohen.d(data_attrib$value~data_attrib$attrib,paired=TRUE,noncentral=TRUE)
+cohen.d(data_attrib$value~data_attrib$manip_attention,paired=FALSE)
+cohen.d(data_attrib$value~data_attrib$manip_cred,paired=FALSE)
+
+###Comparaisons multiples pour double interaction
+#attention * cred
+
+lm_aov_source = lm(value~manip_cred*manip_attention,data=data_attrib)
+
+tmp <- expand.grid(manip_attention = unique(data_attrib$manip_attention),manip_cred = unique(data_attrib$manip_cred))
+X <- model.matrix(~ manip_cred * manip_attention, data = tmp)
+glht(lm_aov_source, linfct = X)
+
+Tukey <- contrMat(table(data_attrib$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_attrib$manip_cred)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_attrib$manip_cred)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_source, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kb = glht(lm_aov_source, linfct = K %*% X)
+kb.ci = confint(kb,level=.95)
+plot(kb.ci)
+
+cohen.d(data_attrib$value[data_attrib$manip_cred=="c"]~data_attrib$manip_attention[data_attrib$manip_cred=="c"],paired=FALSE)
+cohen.d(data_attrib$value[data_attrib$manip_cred=="nc"]~data_attrib$manip_attention[data_attrib$manip_cred=="nc"],paired=FALSE)
+
+
+###Comparaisons multiples pour double interaction
+#attention * liste
+
+lm_aov_source = lm(value~attrib*manip_attention,data=data_attrib)
+
+tmp <- expand.grid(manip_attention = unique(data_attrib$manip_attention),attrib = unique(data_attrib$attrib))
+X <- model.matrix(~ attrib * manip_attention, data = tmp)
+glht(lm_aov_source, linfct = X)
+
+Tukey <- contrMat(table(data_attrib$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_attrib$attrib)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_attrib$attrib)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_source, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kc = glht(lm_aov_source, linfct = K %*% X)
+kc.ci = confint(kc,level=.95)
+plot(kc.ci)
+
+cohen.d(data_attrib$value[data_attrib$attrib=="prop_cred_cred_corrected"]~data_attrib$manip_attention[data_attrib$attrib=="prop_cred_cred_corrected"],paired=FALSE)
+cohen.d(data_attrib$value[data_attrib$attrib=="prop_nocred_nocred_corrected"]~data_attrib$manip_attention[data_attrib$attrib=="prop_nocred_nocred_corrected"],paired=FALSE)
+
+###Comparaisons multiples pour double interaction
+#list * cred
+lm_aov_source = lm(value~attrib*manip_cred,data=data_attrib)
+
+tmp <- expand.grid(attrib = unique(data_attrib$attrib),manip_cred = unique(data_attrib$manip_cred))
+X <- model.matrix(~ attrib * manip_cred, data = tmp)
+glht(lm_aov_source, linfct = X)
+
+Tukey <- contrMat(table(data_attrib$attrib), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_attrib$manip_cred)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_attrib$manip_cred)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_source, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kd = glht(lm_aov_source, linfct = K %*% X)
+kd.ci = confint(kd,level=.95)
+plot(kd.ci)
+
+cohen.d(data_attrib$value[data_attrib$manip_cred=="c"]~data_attrib$attrib[data_attrib$manip_cred=="c"],paired=TRUE)
+cohen.d(data_attrib$value[data_attrib$manip_cred=="nc"]~data_attrib$attrib[data_attrib$manip_cred=="nc"],paired=TRUE)
+
+cohen.d(data_attribc[[2]]$value~data_attribc[[2]]$attrib,paired=TRUE)
+cohen.d(data_attribc[[1]]$value~data_attribc[[1]]$attrib,paired=TRUE)
+
+###Comparaisons multiples pour triple interaction
+lm_aov_source = lm(value~attrib*manip_attention*manip_cred,data=data_attrib)
+
+tmp <- expand.grid(attrib = unique(data_attrib$attrib),manip_cred = unique(data_attrib$manip_cred),manip_attention = unique(data_attrib$manip_attention))
+X <- model.matrix(~ attrib * manip_attention * manip_cred, data = tmp)
+glht(lm_aov_source, linfct = X)
+
+Tukey <- contrMat(table(data_attrib$attrib,data_attrib$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_attrib$manip_cred)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_attrib$manip_cred)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_source, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kd = glht(lm_aov_source, linfct = K %*% X)
+kd.ci = confint(kd,level=.95)
+plot(kd.ci)
+
+cohen.d(data_attrib$value~data_attrib$attrib,paired = TRUE)
+cohen.d(data_attrib$value[data_attrib$manip_cred=="c"]~data_attrib$attrib[data_attrib$manip_cred=="c"],paired = TRUE)
+cohen.d(data_attrib$value[data_attrib$manip_cred=="nc"]~data_attrib$attrib[data_attrib$manip_cred=="nc"],paired = TRUE)
+cohen.d(data_attrib$value[data_attrib$manip_cred=="c"]~data_attrib$manip_attention[data_attrib$manip_cred=="c"],paired=FALSE)
+cohen.d(data_attrib$value[data_attrib$manip_cred=="nc"]~data_attrib$manip_attention[data_attrib$manip_cred=="nc"],paired = FALSE)
+cohen.d(data_attrib$value[data_attrib$manip_attention=="d"]~data_attrib$manip_cred[data_attrib$manip_attention=="d"],paired = FALSE)
+cohen.d(data_attrib$value[data_attrib$manip_attention=="nd"]~data_attrib$manip_cred[data_attrib$manip_attention=="nd"],paired = FALSE)
+
+```
+
+Les variables "prop_cred_cred_corrected" et "prop_nocred_nocred_corrected" désignent les scores de mémoire de source dans la liste1/ crédible et liste2/ douteuse, respectivement. Le score de mémoire de source est significativement plus élevé dans la liste 1/ crédible lorsque la crédibilité est manipulée que non manipulée. Le score est également plus élevé dans la liste 2/ douteuse lorsque la crédibilité est manipulée que non manipulée. Enfin, le score est plus élevé dans la liste 2/ douteuse lorsque la crédibilité est manipulée que dans la liste 1/ crédible lorsque la crédibilité n'est pas manipulée.
+
+###Effets de la division de l'attention et de la crédibilité sur la reconnaissance
+
+Aucun effet de la division de l'attention n'ayant été trouvé sur le score de mémoire de source, des tests non pré-enregistrés ont été effectués sur le score de reconnaissance afin de fournir davantage de résultats et tester différemment cette hypothèse.
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+#Compute the 2*2 ANOVA on the recognition score
+
+aov_recog = ezANOVA(data = data
+                    , dv = reco_corrected 
+                    , wid = ppt
+                    , between = .(manip_attention,manip_cred)
+                    , return_aov = TRUE
+                    , detailed = TRUE
+                    , type = 3
+)
+
+aov_recog
+
+cohen.d(data$reco_corrected~data$manip_attention,paired=FALSE)
+cohen.d(data$reco_corrected~data$manip_cred,paired=FALSE)
+
+###Comparaisons multiples pour chaque variable
+lm_aov_reco = lm(reco_corrected~manip_attention+manip_cred,data=data)
+
+k1 = glht(lm_aov_reco, mcp(manip_attention = "Tukey"))$linfct
+k2 = glht(lm_aov_reco, mcp(manip_cred = "Tukey"))$linfct
+summary(glht(lm_aov_reco,linfct=rbind(k1,k2)), test = adjusted(type = "bonferroni"))
+ka = (glht(lm_aov_reco,linfct=rbind(k1,k2)))
+
+ka.ci = confint(ka,level = .95)
+plot(ka.ci)
+
+###Comparaisons multiples pour double interaction
+#attention * cred
+lm_aov_reco = lm(reco_corrected~manip_attention*manip_cred,data=data)
+
+tmp <- expand.grid(manip_attention = unique(data$manip_attention),manip_cred = unique(data$manip_cred))
+X <- model.matrix(~ manip_attention * manip_cred, data = tmp)
+glht(lm_aov_reco, linfct = X)
+
+Tukey <- contrMat(table(data$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data$manip_cred)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data$manip_cred)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_reco, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kc = glht(lm_aov_reco, linfct = K %*% X)
+kc.ci = confint(kc,level=.95)
+plot(kc.ci)
+
+cohen.d(data$reco_corrected[data$manip_cred=="c"]~data$manip_attention[data$manip_cred=="c"],paired=FALSE)
+cohen.d(data$reco_corrected[data$manip_cred=="nc"]~data$manip_attention[data$manip_cred=="nc"],paired=FALSE)
+```
+
+Les résultats montrent clairement que les effets sont très petits, même négligeables. 
+
+###Recollection et familiarité  en fonction de la division de l'attention lorsque la crédibilité est manipulée
+
+Lorsque la crédibilité est manipulée, des indices de recollection et de familiarité peuvent être calculés. J'ai donc réalisé deux t test pour groupes indépendants pour tester l'effet de la division de l'attention sur ces deux scores.
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+#Compute the independent samples t tests on the recollection and familiarity scores.
+##First, compute these scores. Correct the recollection score with negative scores set to 0.
+
+data_cred$R = data_cred$prop_true_cred - data_cred$prop_true_nocred
+data_cred$F = data_cred$prop_true_nocred / (1 - data_cred$R)
+for(i in 1:93){
+  
+  if (data_cred$R[i]<0) {
+    data_cred$R[i]=0
+  }
+}
+t.test(data_cred$R~data_cred$manip_attention,paired=FALSE,var.equal=TRUE)
+cohen.d(data_cred$R~data_cred$manip_attention,paired=FALSE)
+
+t.test(data_cred$F~data_cred$manip_attention,paired=FALSE,var.equal=TRUE)
+cohen.d(data_cred$F~data_cred$manip_attention,paired=FALSE)
+```
+
+Bien que les résultats soient non significatifs sur la recollection comme sur la familiarité, les tailles d'effet associées diffèrent. Alors que l'effet de la division de l'attention est négligeable à moyen sur la recollection (pour rappel, la convention de Cohen propose d = .20 pour un petit effet), l'effet sur la familiarité est environ 4 fois plus petit, et dans le sens opposé. Sur la recollection, le score de recollection tend à être plus élevé avec attention dite divisée que sans, ce qui est contraire à nos attentes. Les intervalles de confiance sont beaucoup trop imprécis pour en tirer une quelconque conclusion.
+
+###Effet de vérité
+
+J'ai réalisé une ANOVA 2(liste) x 2(attention) x 2(crédibilité) sur le score de jugement de vérité.
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+#Compute the 2*2*2 ANOVA on the truth judgement score
+
+aov_truthjudg = ezANOVA(data = data_list
+                              , dv = value
+                              , wid = ppt
+                              , within = list
+                              , between = .(manip_attention,manip_cred)
+                              , return_aov = TRUE
+                              , type = 3
+                              
+)
+
+aov_truthjudg
+```
+
+Parmi les effets principaux, seul l'effet de la liste ressort. Il est qualifié par un effet d'interaction de magnitude comparable avec la crédibilité. En outre, la division de l'attention et la crédibilité intéragissent significativement sur le score de jugement de vérité. Enfin, ces doubles interactions sont qualifiées par une triple interaction significative, dont la taille est plus faible que celle visée dans l'analyse de puissance statistique. Des comparaisons multiples et des ANOVAs séparées dans les deux conditions de crédibilité vont permettre d'approfondir ces résultats.
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+#Based on the previous ANOVA, compute the multiple comparisons and effect sizes
+
+###Comparaisons multiples pour chaque variable
+lm_aov_truth = lm(value~list+manip_attention+manip_cred,data=data_list)
+
+k1 = glht(lm_aov_truth, mcp(list = "Tukey"))$linfct
+k2 = glht(lm_aov_truth, mcp(manip_attention = "Tukey"))$linfct
+k3 = glht(lm_aov_truth, mcp(manip_cred = "Tukey"))$linfct
+summary(glht(lm_aov_truth,linfct=rbind(k1,k2,k3)), test = adjusted(type = "bonferroni"))
+ka = (glht(lm_aov_truth,linfct=rbind(k1,k2,k3)))
+
+ka.ci = confint(ka,level = .95)
+plot(ka.ci)
+
+cohen.d(data_list$value~data_list$list,paired=TRUE,noncentral=TRUE)
+cohen.d(data_list$value~data_list$manip_attention,paired=FALSE)
+cohen.d(data_list$value~data_list$manip_cred,paired=FALSE)
+
+###Comparaisons multiples pour double interaction
+#attention * cred
+lm_aov_truth = lm(value~manip_cred*manip_attention,data=data_list)
+
+tmp <- expand.grid(manip_attention = unique(data_list$manip_attention),manip_cred = unique(data_list$manip_cred))
+X <- model.matrix(~ manip_cred*manip_attention, data = tmp)
+glht(lm_aov_truth, linfct = X)
+
+Tukey <- contrMat(table(data_list$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_list$manip_cred)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_list$manip_cred)[1],rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_truth, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kb = glht(lm_aov_truth, linfct = K %*% X)
+kb.ci = confint(kb,level=.95)
+plot(kb.ci)
+
+cohen.d(data_list$value[data_list$manip_cred=="c"]~data_list$manip_attention[data_list$manip_cred=="c"],paired=FALSE)
+cohen.d(data_list$value[data_list$manip_cred=="nc"]~data_list$manip_attention[data_list$manip_cred=="nc"],paired=FALSE)
+
+
+###Comparaisons multiples pour double interaction
+#attention * liste
+lm_aov_truth = lm(value~list*manip_attention,data=data_list)
+
+tmp <- expand.grid(manip_attention = unique(data_list$manip_attention),list = unique(data_list$list))
+X <- model.matrix(~ list * manip_attention, data = tmp)
+glht(lm_aov_truth, linfct = X)
+
+Tukey <- contrMat(table(data_list$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_list$list)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_list$list)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_truth, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kc = glht(lm_aov_truth, linfct = K %*% X)
+kc.ci = confint(kc,level=.95)
+plot(kc.ci)
+
+cohen.d(data_list$value[data_list$list=="diff_prop_cred_n"]~data_list$manip_attention[data_list$list=="diff_prop_cred_n"],paired=FALSE)
+cohen.d(data_list$value[data_list$list=="diff_prop_nocred_n"]~data_list$manip_attention[data_list$list=="diff_prop_nocred_n"],paired=FALSE)
+
+
+###Comparaisons multiples pour double interaction
+#list * cred
+
+lm_aov_truth = lm(value~list*manip_cred,data=data_list)
+
+tmp <- expand.grid(list = unique(data_list$list),manip_cred = unique(data_list$manip_cred))
+X <- model.matrix(~ list * manip_cred, data = tmp)
+glht(lm_aov_truth, linfct = X)
+
+Tukey <- contrMat(table(data_list$list), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_list$manip_cred)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_list$manip_cred)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_truth, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kd = glht(lm_aov_truth, linfct = K %*% X)
+kd.ci = confint(kd,level=.95)
+plot(kd.ci)
+
+cohen.d(data_list$value[data_list$manip_cred=="c"]~data_list$list[data_list$manip_cred=="c"],paired=TRUE)
+cohen.d(data_list$value[data_list$manip_cred=="nc"]~data_list$list[data_list$manip_cred=="nc"],paired=TRUE)
+
+###Comparaisons multiples pour triple interaction
+lm_aov_truth = lm(value~list*manip_attention*manip_cred,data=data_list)
+
+tmp <- expand.grid(list = unique(data_list$list),manip_cred = unique(data_list$manip_cred),manip_attention = unique(data_list$manip_attention))
+X <- model.matrix(~ list * manip_attention * manip_cred, data = tmp)
+glht(lm_aov_truth, linfct = X)
+
+Tukey <- contrMat(table(data_list$list,data_list$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_list$manip_cred)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_list$manip_cred)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_truth, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kd = glht(lm_aov_truth, linfct = K %*% X)
+kd.ci = confint(kd,level=.95)
+plot(kd.ci)
+
+cohen.d(data_list$value,data_list$list,paired = TRUE)
+cohen.d(data_list$value[data_list$manip_cred=="c"],data_list$list[data_list$manip_cred=="c"],paired = TRUE)
+cohen.d(data_list$value[data_list$manip_cred=="nc"],data_list$list[data_list$manip_cred=="nc"],paired = TRUE)
+cohen.d(data_list$value[data_list$manip_cred=="c"],data_list$manip_attention[data_list$manip_cred=="c"])
+cohen.d(data_list$value[data_list$manip_cred=="nc"],data_list$manip_attention[data_list$manip_cred=="nc"])
+cohen.d(data_list$value[data_list$manip_attention=="d"],data_list$manip_cred[data_list$manip_attention=="d"])
+cohen.d(data_list$value[data_list$manip_attention=="nd"],data_list$manip_cred[data_list$manip_attention=="nd"])
+```
+
+Le score de jugement de vérité est en moyenne plus élevé dans la liste 1/ crédible que non crédible. Cette taille d'effet est petite.
+Concernant l'interaction crédibilité * attention, les résultats montrent que l'effet de la division de l'attention sur le score de vérité est très faible et non significatif lorsque la crédibilité est manipulée. À l'inverse, lorsque la crédibilité n'est pas manipulée, cet effet est moyen et significatif.
+
+J'ai réalisé une ANOVA 2(list)*2(attention) sur le score de jugement de vérité dans chaque condition de la crédibilité. Elles sont présentées ci-dessous avec les comparaisons multiples et les tailles des effets associés.
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+#Compute the 2*2 ANOVAs in each credibility condition
+##First, the ANOVA with credibility, multiple comparisons and effect sizes
+
+aov_truthjudg_c = ezANOVA(data = data_listc[[1]]
+                        , dv = value
+                        , wid = ppt
+                        , within = list
+                        , between = manip_attention
+                        , return_aov = TRUE
+                        , type = 3
+                        
+)
+
+aov_truthjudg_c
+
+###Comparaisons multiples pour chaque variable
+lm_aov_truthc = lm(value~list+manip_attention,data=data_listc[[1]])
+
+k1 = glht(lm_aov_truthc, mcp(list = "Tukey"))$linfct
+k2 = glht(lm_aov_truthc, mcp(manip_attention = "Tukey"))$linfct
+summary(glht(lm_aov_truthc,linfct=rbind(k1,k2)), test = adjusted(type = "bonferroni"))
+ka = (glht(lm_aov_truthc,linfct=rbind(k1,k2)))
+
+ka.ci = confint(ka,level = .95)
+plot(ka.ci)
+
+cohen.d(data_listc[[1]]$value~data_listc[[1]]$list,paired=TRUE)
+cohen.d(data_listc[[1]]$value~data_listc[[1]]$manip_attention,paired=FALSE)
+
+
+###Comparaisons multiples pour double interaction
+#attention * liste
+lm_aov_truthc = lm(value~list*manip_attention,data=data_listc[[1]])
+
+tmp <- expand.grid(manip_attention = unique(data_listc[[1]]$manip_attention),list = unique(data_listc[[1]]$list))
+X <- model.matrix(~ list * manip_attention, data = tmp)
+glht(lm_aov_truthc, linfct = X)
+
+Tukey <- contrMat(table(data_listc[[1]]$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_listc[[1]]$list)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_listc[[1]]$attrib)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_truthc, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kc = glht(lm_aov_truthc, linfct = K %*% X)
+kc.ci = confint(kc,level=.95)
+plot(kc.ci)
+
+cohen.d(data_listc[[1]]$value[data_listc[[1]]$list=="diff_prop_cred_n"]~data_listc[[1]]$manip_attention[data_listc[[1]]$list=="diff_prop_cred_n"],paired=FALSE)
+cohen.d(data_listc[[1]]$value[data_listc[[1]]$list=="diff_prop_nocred_n"]~data_listc[[1]]$manip_attention[data_listc[[1]]$list=="diff_prop_nocred_n"],paired=FALSE)
+```
+
+Lorsque la crédibilité est manipulée, seul l'effet de la liste est significatif, de taille moyenne. Le score de jugement de vérité est plus élevé dans la liste crédible que non crédible. 
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+##Now, the ANOVA without credibility, multiple comparisons and effect sizes
+
+aov_truthjudg_nc = ezANOVA(data = data_listc[[2]]
+                          , dv = value
+                          , wid = ppt
+                          , within = list
+                          , between = manip_attention
+                          , return_aov = TRUE
+                          , type = 3
+                          
+)
+
+aov_truthjudg_nc
+
+###Comparaisons multiples pour chaque variable
+lm_aov_truthnc = lm(value~list+manip_attention,data=data_listc[[2]])
+
+k1 = glht(lm_aov_truthnc, mcp(list = "Tukey"))$linfct
+k2 = glht(lm_aov_truthnc, mcp(manip_attention = "Tukey"))$linfct
+summary(glht(lm_aov_truthnc,linfct=rbind(k1,k2)), test = adjusted(type = "bonferroni"))
+ka = (glht(lm_aov_truthnc,linfct=rbind(k1,k2)))
+
+ka.ci = confint(ka,level = .95)
+plot(ka.ci)
+
+cohen.d(data_listc[[2]]$value~data_listc[[2]]$list,paired=TRUE)
+cohen.d(data_listc[[2]]$value~data_listc[[2]]$manip_attention,paired=FALSE)
+
+###Comparaisons multiples pour double interaction
+#attention * liste
+lm_aov_truthnc = lm(value~list*manip_attention,data=data_listc[[2]])
+
+tmp <- expand.grid(manip_attention = unique(data_listc[[2]]$manip_attention),list = unique(data_listc[[2]]$list))
+X <- model.matrix(~ list * manip_attention, data = tmp)
+glht(lm_aov_truthnc, linfct = X)
+
+Tukey <- contrMat(table(data_listc[[2]]$manip_attention), "Tukey")
+K1 <- cbind(Tukey, matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)))
+rownames(K1) <- paste(levels(data_listc[[2]]$list)[2], rownames(K1), sep = ":")
+K2 <- cbind(matrix(0, nrow = nrow(Tukey), ncol = ncol(Tukey)), Tukey)
+rownames(K2) <- paste(levels(data_listc[[2]]$attrib)[1], rownames(K2), sep = ":")
+K <- rbind(K1, K2)
+colnames(K) <- c(colnames(Tukey), colnames(Tukey))
+
+summary(glht(lm_aov_truthnc, linfct = K %*% X), test = adjusted(type = "bonferroni"))
+
+kc = glht(lm_aov_truthnc, linfct = K %*% X)
+kc.ci = confint(kc,level=.95)
+plot(kc.ci)
+
+cohen.d(data_listc[[2]]$value[data_listc[[2]]$list=="diff_prop_cred_n"]~data_listc[[2]]$manip_attention[data_listc[[2]]$list=="diff_prop_cred_n"],paired=FALSE)
+cohen.d(data_listc[[2]]$value[data_listc[[2]]$list=="diff_prop_nocred_n"]~data_listc[[2]]$manip_attention[data_listc[[2]]$list=="diff_prop_nocred_n"],paired=FALSE)
+```
+
+À l'inverse, lorsque la crédibilité n'est pas manipulée, un effet principal moyen de la division de l'attention est retrouvé. En outre, cet effet est qualifié par une interaction significative de petite taille entre la division de l'attention et la liste. Les comparaisons multiples montrent que le score de jugement de vérité est plus élevé sur la liste 1 lorsque l'attention est divisée que pleine, et sur la liste 2 lorsque l'attention est divisée que pleine. Cependant, le graphique (plus bas) montre que la différence est plus élevée dans la liste 2 que 1. À regarder les d de cohen associés à l'interaction, dans la liste 1, l'effet de la division de l'attention sur le score de jugement de vérité est petit et n'exclut pas 0, 95%IC = [-.71; .12]. À l'inverse, dans la liste 2, l'effet de la division de l'attention sur le score de jugement de vérité est moyen et exclut 0, 95%IC = [-1.09; -.24].
+
+#Figures produites
+
+Pour terminer, je présente ici les figures produites.
+
+##Scores de mémoire de source en fonction de la liste, de la division de l'attention et de la crédibilité
+
+Note : les barres d'erreur représentent les intervalles de confiance à 95%. 
+
+```{r, include=TRUE,comment=NA,echo=FALSE}
+#Make a barplot for the source memory score according to list, credibility and attention division
+
+windowsFonts(Times=windowsFont("TT Times New Roman"))
+limits = aes(ymax = mean + (1.96*se), ymin=mean - (1.96*se))
+dodge = position_dodge(width=0.9)
+
+apatheme=theme_bw()+
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.border=element_blank(),
+        axis.line=element_line(),
+        text=element_text(family='Times'))
+
+dat = describeBy(data_attrib$value,list(data_attrib$attrib,data_attrib$manip_cred,data_attrib$manip_attention), mat=TRUE,digits=2)
+dat$se = dat$sd/sqrt(dat$n)
+
+names(dat)[names(dat) == 'group1'] = 'List'
+names(dat)[names(dat) == 'group2'] = 'Credibility'
+names(dat)[names(dat) == 'group3'] = "Attention"
+
+levels(dat$List)[levels(dat$List)=='prop_cred_cred_corrected'] = 'List1/ credible'
+levels(dat$List)[levels(dat$List)=='prop_nocred_nocred_corrected'] = 'List2/ doubtful'
+
+levels(dat$Credibility)[levels(dat$Credibility)=='c'] = 'With credibility'
+levels(dat$Credibility)[levels(dat$Credibility)=='nc'] = 'Without credibility'
+
+levels(dat$Attention)[levels(dat$Attention)=='d'] = 'Divided'
+levels(dat$Attention)[levels(dat$Attention)=='nd'] = 'Full'
+
+p=ggplot(dat, aes(x = List, y = mean, fill = Attention))+
+  geom_bar(stat='identity', position=dodge)+
+  geom_errorbar(limits, position=dodge, width=0.25)+
+  facet_wrap(~ Credibility)+
+  ylab('Mean source memory score')+
+  apatheme+
+  scale_fill_grey()
+p
+```
+
+##Score de jugement de vérité en fonction de la liste, de la division de l'attention et de la crédibilité
+
+Note : les barres noires représentent les moyennes et les rectangles de couleur les intervalles de confiance à 95%. La ligne horizontale représente l'absence d'effet de vérité.
+
+```{r, include=TRUE,comment=NA,echo=FALSE}
+#Make a plot for the truth judgement score according to list, credibility and attention division
+windowsFonts(Times=windowsFont("TT Times New Roman"))
+plot = describeBy(data_list$value,list(data_list$list,data_list$manip_cred,data_list$manip_attention), mat=TRUE,digits=2)
+plot$se = plot$sd/sqrt(plot$n)
+
+names(plot)[names(plot) == 'group1'] = 'List'
+names(plot)[names(plot) == 'group2'] = 'Credibility'
+names(plot)[names(plot) == 'group3'] = "Attention"
+
+levels(plot$List)[levels(plot$List)=='diff_prop_cred_n'] = 'List 1/ credible'
+levels(plot$List)[levels(plot$List)=='diff_prop_nocred_n'] = 'List 2/ doubtful'
+
+levels(plot$Credibility)[levels(plot$Credibility)=='c'] = 'With credibility'
+levels(plot$Credibility)[levels(plot$Credibility)=='nc'] = 'Without credibility'
+
+levels(plot$Attention)[levels(plot$Attention)=='d'] = 'Divided'
+levels(plot$Attention)[levels(plot$Attention)=='nd'] = 'Full'
+
+tet <- ggplot(plot, aes(x = List, y = mean, fill = Attention)) +
+  geom_boxplot() +
+  geom_crossbar(aes(ymin = mean-(1.96*se), ymax=mean+(1.96*se)),
+                position=position_dodge(.9), size=1, color = "black")+
+  facet_wrap(~ Credibility)+labs(x = "List", y = "Mean truth judgement score", fill = "crédibilité")+
+  scale_fill_manual("Attention", values = c("Divided" = "grey", "Full" = "white"))+
+  theme(text=element_text(family="Times", face="bold", size=12))+
+  geom_hline(yintercept = 0)+
+  apatheme                                                                                                                    
+tet
+```
+
+#Modèle mixte généralisé
+
+Afin de fournir un test plus contraignant des hypothèses, un modèle mixte généralisé a été constitué. La source (liste 1/ crédible ; liste 2/ douteux ; nouveau), la division de l'attention et la crédibilité ont été rentrées en facteurs, les réponses dichotomiques au jugement de vérité (vrai; faux) ont été rentrées comme VD, et les énoncés et participants ont été rentrés en tant que variables aléatoires.
+
+```{r, include=TRUE,comment=NA,echo=TRUE}
+#Fit a generalized linear mixed-effects model on dichotomous truth judgement responses according to source (list1/ credible; list/ doubtful; new), credibility and attention. Random effects : participants and statements
+
+model_t_log <- glmer(truth_rating_num ~ enonce_source*manip_attention*manip_cred+(1|ppt)+(1|enonce),family=binomial,data=data_extend,control=glmerControl(optimizer="bobyqa",
+                            optCtrl=list(maxfun=2e5)))
+summary(model_t_log)
+anova(model_t_log)
+```
+
+Les résultats diffèrent partiellement de ceux mis en évidence avant. Alors que l'effet principal de la liste (source ici) et de la crédibilité restent significatifs, l'interaction entre la division de l'attention et la crédibilité est marginalement significative (p = .078). En outre, la triple interaction n'est plus significative ici. Je ne connais pas les raisons précises de ces divergences. Il semblerait que des caractéristiques associées aux participants et/ ou aux énoncés n'aient pas totalement été éliminées par le design et aient pu influencer les principaux résultats rapportés. 
